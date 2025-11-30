@@ -14,8 +14,12 @@
     "preview": "npm run preview --prefix frontend",
     "deploy:s3": "node scripts/deploy-to-s3.js",
     "deploy:s3:file": "node scripts/deploy-to-s3.js $1",
+    "deploy:postgis": "node scripts/deploy-postgis.js",
+    "deploy:postgis:file": "node scripts/deploy-postgis.js $1",
+    "deploy:s3:bucket": "cross-env AWS_S3_BUCKET=reto-comu-pointcloud node scripts/deploy-to-s3.js",
     "invalidate:cf": "node scripts/invalidate-cloudfront.js",
-    "deploy:full": "npm run build && npm run deploy:s3 && npm run invalidate:cf"
+    "deploy:full": "npm run build && npm run deploy:s3 && npm run invalidate:cf",
+    "deploy:full:postgis": "npm run build && npm run deploy:s3 && npm run deploy:postgis && npm run invalidate:cf"
   },
   "devDependencies": {
     "concurrently": "^8.2.1"

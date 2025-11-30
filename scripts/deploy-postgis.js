@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Script para subir nube de puntos a S3
+ * Script para subir datos PostGIS/espaciales a S3
  * 
  * Uso:
- *   node scripts/deploy-to-s3.js archivo.laz
+ *   node scripts/deploy-postgis.js archivo.json
+ *   node scripts/deploy-postgis.js archivo.sql
  * 
  * Variables de entorno requeridas:
  *   AWS_ACCESS_KEY_ID
  *   AWS_SECRET_ACCESS_KEY
- *   AWS_REGION (default: us-east-1)
- *   AWS_S3_BUCKET (default: mi-nube-puntos)
+ *   AWS_S3_BUCKET (default: reto-comu-pointcloud)
  */
 
 const AWS = require('aws-sdk')
@@ -24,22 +24,8 @@ const s3 = new AWS.S3({
 })
 
 const BUCKET = process.env.AWS_S3_BUCKET || 'reto-comu-pointcloud'
-const FILE_PATH = process.argv[2] || './cloud.laz'
-// Detectar tipo de archivo para colocar en carpeta correcta
-const isPostGIS = FILE_PATH.includes('postgis') || FILE_PATH.endsWith('.sql') || FILE_PATH.endsWith('.json')
-const isAsset = FILE_PATH.includes('asset') || FILE_PATH.endsWith('.png') || FILE_PATH.endsWith('.jpg')
-const isModel = FILE_PATH.includes('model') || FILE_PATH.endsWith('.gltf') || FILE_PATH.endsWith('.glb')
-
-let S3_KEY = ''
-if (isPostGIS) {
-  S3_KEY = `postgis/${path.basename(FILE_PATH)}`
-} else if (isAsset) {
-  S3_KEY = `assets/${path.basename(FILE_PATH)}`
-} else if (isModel) {
-  S3_KEY = `models/${path.basename(FILE_PATH)}`
-} else {
-  S3_KEY = `${path.basename(FILE_PATH)}` // Potree files en raíz
-}
+const FILE_PATH = process.argv[2] || './data.json'
+const S3_KEY = `postgis/${path.basename(FILE_PATH)}`
 
 /**
  * Valida que el archivo existe
@@ -47,12 +33,13 @@ if (isPostGIS) {
 function validateFile() {
   if (!fs.existsSync(FILE_PATH)) {
     console.error(`❌ Error: Archivo no encontrado: ${FILE_PATH}`)
-    console.error(`Uso: node deploy-to-s3.js <ruta-archivo.laz>`)
+    console.error(`Uso: node deploy-postgis.js <archivo.json|archivo.sql>`)
     process.exit(1)
   }
 
-  if (!FILE_PATH.endsWith('.laz') && !FILE_PATH.endsWith('.las')) {
-    console.error('⚠️  Advertencia: Archivo no es .laz o .las')
+  const ext = path.extname(FILE_PATH).toLowerCase()
+  if (!['.json', '.sql', '.geojson', '.csv'].includes(ext)) {
+    console.warn(`⚠️  Advertencia: Extensión no común para PostGIS: ${ext}`)
   }
 }
 
@@ -70,37 +57,51 @@ function validateCredentials() {
 }
 
 /**
- * Sube archivo a S3
+ * Sube archivo PostGIS a S3
  */
-async function uploadToS3() {
+async function uploadPostGIS() {
   validateCredentials()
   validateFile()
 
   const fileSize = fs.statSync(FILE_PATH).size
   const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2)
+  const fileType = path.extname(FILE_PATH).toLowerCase()
 
-  console.log('\n📤 Iniciando upload a S3...')
+  console.log('\n📤 Subiendo datos PostGIS a S3...')
   console.log(`📂 Archivo: ${FILE_PATH}`)
   console.log(`📊 Tamaño: ${fileSizeMB}MB`)
+  console.log(`🗂️  Tipo: ${fileType}`)
   console.log(`🎯 Destino: s3://${BUCKET}/${S3_KEY}`)
   console.log(`🌍 Región: ${process.env.AWS_REGION || 'us-east-1'}`)
   console.log('---\n')
 
   const fileContent = fs.readFileSync(FILE_PATH)
 
+  // Detectar Content-Type según extensión
+  let contentType = 'application/octet-stream'
+  if (fileType === '.json' || fileType === '.geojson') {
+    contentType = 'application/json'
+  } else if (fileType === '.sql') {
+    contentType = 'application/sql'
+  } else if (fileType === '.csv') {
+    contentType = 'text/csv'
+  }
+
   try {
     const params = {
       Bucket: BUCKET,
       Key: S3_KEY,
       Body: fileContent,
-      ContentType: 'application/octet-stream',
+      ContentType: contentType,
       Metadata: {
         'uploaded-at': new Date().toISOString(),
         'file-size': fileSizeMB,
+        'file-type': fileType,
         'original-name': path.basename(FILE_PATH),
+        'data-type': 'postgis',
       },
-      // Metadata para CloudFront
-      CacheControl: 'max-age=2592000, public', // 30 días
+      // Caché de 24 horas para datos
+      CacheControl: 'max-age=86400, public',
     }
 
     // Crear objeto upload
@@ -122,28 +123,27 @@ async function uploadToS3() {
     // Esperar a que complete
     const result = await upload.promise()
 
-    console.log('\n\n✅ Upload completado exitosamente!\n')
+    console.log('\n\n✅ Upload de PostGIS completado!\n')
     console.log('📍 Información de S3:')
     console.log(`   URL: ${result.Location}`)
     console.log(`   Etag: ${result.ETag}`)
     console.log(`   Tamaño: ${fileSizeMB}MB`)
+    console.log(`   Tipo: ${fileType}`)
 
     console.log('\n🔗 URLs de acceso:')
     console.log(`   S3 (directo): ${result.Location}`)
     
-    if (process.env.AWS_CLOUDFRONT_URL) {
-      const cfUrl = `${process.env.AWS_CLOUDFRONT_URL}/${S3_KEY}`
+    if (process.env.AWS_CLOUDFRONT_URL || process.env.AWS_CLOUDFRONT_DISTRIBUTION_ID) {
+      const cfUrl = `${process.env.AWS_CLOUDFRONT_URL || 'https://d2h8nqd60uagyp.cloudfront.net'}/${S3_KEY}`
       console.log(`   CloudFront: ${cfUrl}`)
     } else {
       console.log('   ⚠️  CloudFront URL no configurada')
-      console.log('   export AWS_CLOUDFRONT_URL=https://dXXXXXX.cloudfront.net')
     }
 
     console.log('\n💡 Próximos pasos:')
-    console.log('   1. Invalidar caché CloudFront: npm run invalidate-cf')
-    console.log('   2. Actualizar .env con la URL de CloudFront')
-    console.log('   3. Hacer commit y push')
-    console.log('   4. GitHub Actions se encargará del deploy\n')
+    console.log('   1. Invalidar caché CloudFront: npm run invalidate:cf')
+    console.log('   2. Acceder a datos: fetch("' + (process.env.AWS_CLOUDFRONT_URL || 'https://d2h8nqd60uagyp.cloudfront.net') + '/' + S3_KEY + '")')
+    console.log('   3. Usar en aplicación: getPostGISUrl("' + path.basename(FILE_PATH) + '")\n')
 
   } catch (err) {
     console.error('\n❌ Error al subir archivo:')
@@ -153,4 +153,4 @@ async function uploadToS3() {
 }
 
 // Ejecutar
-uploadToS3()
+uploadPostGIS()

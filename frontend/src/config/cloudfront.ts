@@ -4,17 +4,31 @@
  */
 
 export const cloudFrontConfig = {
-  // URL base de CloudFront (reemplazar con tu domain)
-  baseUrl: import.meta.env.VITE_CLOUDFRONT_URL || 'https://d123456abc.cloudfront.net',
+  // URL base de CloudFront - Bucket: reto-comu-pointcloud
+  baseUrl: import.meta.env.VITE_CLOUDFRONT_URL || 'https://d2h8nqd60uagyp.cloudfront.net',
   
-  // Rutas de archivos
+  // Bucket S3 real
+  bucket: import.meta.env.VITE_S3_BUCKET || 'reto-comu-pointcloud',
+  
+  // Rutas de archivos (estructura del bucket)
   paths: {
-    cloud: import.meta.env.VITE_POINTCLOUD_PATH || '/pointclouds/cloud.laz',
+    // Archivos Potree/nube de puntos (raíz del bucket)
+    potree: import.meta.env.VITE_POINTCLOUD_PATH || '/',
+    
+    // Rutas de fallback para intentos
     backup: [
-      '/pointclouds/cloud.laz',
-      '/pointclouds/cloud.las',
-      '/pointclouds/sensores.laz',
+      '/',  // Raíz del bucket
+      '/potree/',
+      '/pointclouds/',
+      '/data/',
     ],
+    
+    // Archivos PostGIS/datos espaciales
+    postgis: '/postgis/',
+    
+    // Otros recursos
+    assets: '/assets/',
+    models: '/models/',
   },
 
   // Habilitar CloudFront (true en producción, false en desarrollo)
@@ -54,15 +68,45 @@ export const getCloudFrontUrl = (path: string): string => {
  */
 export const getPointCloudUrls = (): string[] => {
   if (cloudFrontConfig.enabled) {
-    // En producción, usar CloudFront como primaria + fallbacks locales
+    // En producción, usar CloudFront como primaria + fallbacks
     return [
-      getCloudFrontUrl(cloudFrontConfig.paths.cloud),
-      ...cloudFrontConfig.paths.backup.map(path => getCloudFrontUrl(path)),
+      getCloudFrontUrl(cloudFrontConfig.paths.potree), // Primaria: raíz del bucket Potree
+      ...cloudFrontConfig.paths.backup.map(path => getCloudFrontUrl(path)), // Fallbacks
     ]
   }
   
   // En desarrollo, usar rutas locales
   return cloudFrontConfig.paths.backup
+}
+
+/**
+ * Obtiene URL de archivo PostGIS/datos espaciales
+ * @param filename - Nombre del archivo
+ * @returns URL completa del archivo
+ */
+export const getPostGISUrl = (filename: string): string => {
+  const path = `${cloudFrontConfig.paths.postgis}${filename}`
+  return getCloudFrontUrl(path)
+}
+
+/**
+ * Obtiene URL de asset/recurso estático
+ * @param filename - Nombre del asset
+ * @returns URL completa del asset
+ */
+export const getAssetUrl = (filename: string): string => {
+  const path = `${cloudFrontConfig.paths.assets}${filename}`
+  return getCloudFrontUrl(path)
+}
+
+/**
+ * Obtiene URL de modelo 3D
+ * @param filename - Nombre del modelo
+ * @returns URL completa del modelo
+ */
+export const getModelUrl = (filename: string): string => {
+  const path = `${cloudFrontConfig.paths.models}${filename}`
+  return getCloudFrontUrl(path)
 }
 
 /**
@@ -105,8 +149,12 @@ export const getCloudFrontStatus = async () => {
     enabled: isEnabled,
     healthy: isHealthy,
     url: cloudFrontConfig.baseUrl,
+    bucket: cloudFrontConfig.bucket,
     status: isEnabled && isHealthy ? '✅ Online' : '⚠️ Offline',
     fallback: 'Local files',
+    message: isEnabled && isHealthy 
+      ? `✅ Cargando desde CloudFront (${cloudFrontConfig.bucket})`
+      : '⚠️ Usando archivos locales',
   }
 }
 
