@@ -35,29 +35,45 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
 
     const loadLib = (src: string, name: string) =>
       new Promise<void>((resolve, reject) => {
-        setStatus(`Cargando ${name}...`);
+        setStatus(`📦 Cargando ${name}...`);
+        console.log(`Cargando ${name} desde: ${src}`);
         const script = document.createElement("script");
         script.src = src;
         script.async = true;
+        script.crossOrigin = "anonymous"; // Permitir CORS
         script.onload = () => {
-          console.log(`✓ ${name} cargado`);
+          console.log(`✓ ${name} cargado correctamente`);
           resolve();
         };
         script.onerror = () => {
-          const err = `No se pudo cargar ${name} desde ${src}`;
+          const err = `❌ No se pudo cargar ${name} desde ${src}`;
           console.error(err);
           reject(new Error(err));
         };
         document.head.appendChild(script);
       });
 
+    const loadCSS = (href: string, name: string) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      link.crossOrigin = "anonymous";
+      document.head.appendChild(link);
+      console.log(`✓ CSS ${name} agregado`);
+    };
+
     const init = async () => {
       try {
+        // Cargar CSS de Potree primero
+        loadCSS(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/build/potree/potree.css`, "Potree CSS");
+
         // Cargar jQuery desde tu S3
         await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/jquery/jquery-3.1.1.min.js`, "jQuery");
+        console.log("jQuery disponible:", (window as any).jQuery ? "✓" : "✗");
 
         // Cargar Three.js desde tu S3
         await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/three.js/build/three.min.js`, "Three.js");
+        console.log("Three.js disponible:", (window as any).THREE ? "✓" : "✗");
 
         // Cargar Tween desde tu S3
         await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/tween/tween.min.js`, "Tween.js");
@@ -66,8 +82,9 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
         await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/other/BinaryHeap.js`, "BinaryHeap.js");
 
         // Cargar Potree desde tu S3
-        setStatus("Cargando Potree...");
+        setStatus("📦 Cargando Potree...");
         await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/build/potree/potree.js`, "Potree.js");
+        console.log("Potree disponible:", (window as any).Potree ? "✓" : "✗");
 
         if (!mountRef.current) {
           throw new Error("Container no disponible");
