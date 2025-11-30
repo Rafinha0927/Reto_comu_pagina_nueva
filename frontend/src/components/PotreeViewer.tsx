@@ -1,178 +1,128 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import SensorModal from "./SensorModal";
-
-declare global {
-  interface Window {
-    Potree: any;
-    THREE: any;
-  }
-}
-
 const SENSOR_POSITIONS: Record<string, [number, number, number]> = {
-  "sensor-01": [-4, 1, 2.5],
-  "sensor-02": [4, 1, 2.5],
-  "sensor-03": [-4, -6, 2.5],
-  "sensor-04": [4, -6, 2.5],
+  "sensor-01": [-4, 2.5, 4],
+  "sensor-02": [4, 2.5, 4],
+  "sensor-03": [-4, 2.5, -4],
+  "sensor-04": [4, 2.5, -4],
 };
 
-const SENSOR_NAMES: Record<string, string> = {
-  "sensor-01": "Esquina Delantera Izquierda",
-  "sensor-02": "Esquina Delantera Derecha",
-  "sensor-03": "Esquina Trasera Izquierda",
-  "sensor-04": "Esquina Trasera Derecha",
-};
-
-interface PotreeViewerProps {
+interface Props {
   latestData: Record<string, any>;
   onSensorClick: (id: string) => void;
 }
 
-export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<any>(null);
-  const pointsRef = useRef<any>(null);
+export default function PotreeViewer({ latestData, onSensorClick }: Props) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
 
-  const getColorFromTemp = (temp: number): [number, number, number] => {
-    if (temp < 18) return [0, 0, 255];     // azul
-    if (temp < 24) return [0, 255, 0];     // verde
-    if (temp < 30) return [255, 255, 0];   // amarillo
-    return [255, 0, 0];                    // rojo
+  const getColorFromTemp = (temp: number) => {
+    if (temp < 18) return [0, 0, 255];
+    if (temp < 24) return [0, 255, 0];
+    if (temp < 30) return [255, 255, 0];
+    return [255, 0, 0];
   };
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    
-    if (window.Potree && window.THREE) {
-      initPotree();
-      return;
-    }
+    if (initialized.current) return;
+    initialized.current = true;
 
-    // Cargar THREE primero
-    const threeScript = document.createElement("script");
-    threeScript.src = "https://cdn.jsdelivr.net/npm/three@0.168/build/three.min.js";
-    threeScript.onload = () => {
-      // Luego cargar Potree
-      const potreeScript = document.createElement("script");
-      potreeScript.src = "https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js";
-      potreeScript.onload = () => initPotree();
-      document.body.appendChild(potreeScript);
+    // Forzamos que los scripts se carguen desde CDN absoluto (esto evita el bug de Vite)
+    const loadScript = (src: string) => {
+      return new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => console.error("Failed to load", src);
+        document.head.appendChild(script);
+      });
     };
-    document.body.appendChild(threeScript);
 
-    const css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = "https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.css";
-    document.head.appendChild(css);
+    const init = async () => {
+      await loadScript("https://cdn.jsdelivr.net/npm/three@0.168/build/three.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/jquery/jquery-3.1.1.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/other/BinaryHeap.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/tween/tween.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/dgreed/dgreed.js");
 
-    return () => {
-      if (threeScript.parentNode) document.body.removeChild(threeScript);
-      if (css.parentNode) document.head.removeChild(css);
+      // Ahora sí creamos el viewer
+      const viewer = new (window as any).Potree.Viewer(mountRef.current!);
+      viewer.setEDLEnabled(true);
+      viewer.setFOV(60);
+      viewer.setPointBudget(1_000_000);
+      viewer.setBackground("black");
+
+      viewer.scene.view.position.set(20, 15, 20);
+      viewer.scene.view.lookAt(0, 0, 0);
+
+      // Crear los 4 puntos
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(12);
+      const colors = new Float32Array(12);
+      const sizes = new Float32Array(4).fill(200);
+
+      Object.values(SENSOR_POSITIONS).forEach(([x, y, z], i) => {
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+        colors[i * 3] = 0.8;
+        colors[i * 3 + 1] = 0.8;
+        colors[i * 3 + 2] = 0.8;
+      });
+
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+
+      const material = new (window as any).Potree.PointsMaterial({
+        vertexColors: THREE.VertexColors,
+        size: 200,
+        sizeType: (window as any).Potree.PointSizeType.FIXED,
+      });
+
+      const points = new (window as any).Potree.Points(geometry, material);
+      points.frustumCulled = false;
+      viewer.scene.pointclouds.push(points);
+      viewer.scene.scene.add(points);
+
+      // Guardamos referencia para actualizar colores
+      (window as any).sensorPoints = { geometry, colors: colors };
+
+      // Click
+      viewer.renderer.domElement.addEventListener("click", (e: MouseEvent) => {
+        const rect = viewer.renderer.domElement.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const camera = viewer.scene.getActiveCamera();
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera({ x, y }, camera);
+        raycaster.params.Points.threshold = 3;
+
+        const hits = raycaster.intersectObject(points);
+        if (hits.length > 0) {
+          const idx = hits[0].index!;
+          const sensorId = Object.keys(SENSOR_POSITIONS)[idx];
+          onSensorClick(sensorId);
+        }
+      });
     };
+
+    init();
   }, []);
 
-  const initPotree = () => {
-    if (!containerRef.current) return;
-
-    const viewer = new window.Potree.Viewer(containerRef.current, {
-      useDefaultUI: false,
-    });
-
-    viewer.setEDLEnabled(true);
-    viewer.setFOV(60);
-    viewer.setPointBudget(2_000_000);
-    viewer.loadGUI(() => {
-      viewer.setLanguage('es');
-    });
-
-    // Cargar octree del salón (muy ligero, solo suelo y paredes)
-    window.Potree.loadPointCloud(
-      "/potree/salon/metadata.json",
-      "salon",
-      (e: any) => {
-        const scene = e.pointcloud;
-        const material = scene.material;
-        material.size = 0.3;
-        material.pointSizeType = window.Potree.PointSizeType.FIXED;
-        material.shape = window.Potree.PointShape.CIRCLE;
-        viewer.scene.addPointCloud(scene);
-
-        viewer.fitToScreen();
-        viewerRef.current = viewer;
-      }
-    );
-
-    // Crear nuestros 4 puntos personalizados (sensores)
-    createSensorPoints(viewer);
-  };
-
-  const createSensorPoints = (viewer: any) => {
-    const THREE = window.THREE;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(4 * 3);
-    const colors = new Float32Array(4 * 3);
-    const sizes = new Float32Array(4);
-
-    Object.entries(SENSOR_POSITIONS).forEach(([id], i) => {
-      const [x, y, z] = SENSOR_POSITIONS[id];
-      positions[i * 3 + 0] = x;
-      positions[i * 3 + 1] = z;  // Potree usa Y como altura
-      positions[i * 3 + 2] = -y; // invertimos Y para orientación
-
-      // Color inicial (gris)
-      colors[i * 3 + 0] = 0.5;
-      colors[i * 3 + 1] = 0.5;
-      colors[i * 3 + 2] = 0.5;
-
-      sizes[i] = 120; // tamaño grande
-    });
-
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
-
-    const material = new window.Potree.PointsMaterial({
-      size: 120,
-      vertexColors: true,
-      sizeType: window.Potree.PointSizeType.FIXED,
-    });
-
-    const points = new window.Potree.Points(geometry, material);
-    points.frustumCulled = false;
-    viewer.scene.pointclouds.push(points);
-    viewer.scene.scene.add(points);
-
-    pointsRef.current = points;
-
-    // Click en sensores
-    viewer.renderer.domElement.addEventListener("mousedown", (event: any) => {
-      const THREE = window.THREE;
-      const mouse = viewer.inputHandler.getNormalizedEventPosition(event);
-      const camera = viewer.scene.getActiveCamera();
-      const domElement = viewer.renderer.domElement;
-
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, camera);
-      raycaster.params.Points.threshold = 0.5;
-
-      const intersects = raycaster.intersectObject(points, true);
-      if (intersects.length > 0) {
-        const i = intersects[0].index;
-        const sensorId = Object.keys(SENSOR_POSITIONS)[i];
-        onSensorClick(sensorId);
-      }
-    });
-  };
+<<<<<<< HEAD
 
   // Actualizar colores en tiempo real
   useEffect(() => {
-    if (!pointsRef.current || !latestData) return;
+    if (!(window as any).sensorPoints) return;
+    const colors = (window as any).sensorPoints.colors;
 
-    const colors = pointsRef.current.geometry.attributes.color;
     Object.entries(SENSOR_POSITIONS).forEach(([id], i) => {
-      const data = latestData[id];
-      const temp = data?.temperature ?? 20;
+      const temp = latestData[id]?.temperature ?? 20;
       const [r, g, b] = getColorFromTemp(temp);
-      colors.array[i * 3 + 0] = r / 255;
+      colors.array[i * 3] = r / 255;
       colors.array[i * 3 + 1] = g / 255;
       colors.array[i * 3 + 2] = b / 255;
     });
@@ -180,11 +130,17 @@ export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewer
   }, [latestData]);
 
   return (
-    <div className="w-full h-screen relative bg-gray-900">
-      <div ref={containerRef} className="absolute inset-0" />
-      <div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white p-4 rounded-lg">
-        <h3 className="text-xl font-bold">Monitoreo Salón - Potree 3D</h3>
-        <p className="text-sm">Haz clic en los puntos para ver detalles</p>
+    <div className="w-full h-screen relative bg-black">
+      <div ref={mountRef} className="absolute inset-0" />
+      <div className="absolute top-4 left-4 bg-black/80 text-white p-6 rounded-xl">
+        <h1 className="text-3xl font-bold mb-2">Monitoreo Salón 3D</h1>
+        <p className="text-lg">Potree + 4 sensores en tiempo real</p>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-3"><div className="w-6 h-6 bg-blue-500 rounded-full"></div> Frío (&lt;18°C)</div>
+          <div className="flex items-center gap-3"><div className="w-6 h-6 bg-green-500 rounded-full"></div> Normal (18-24°C)</div>
+          <div className="flex items-center gap-3"><div className="w-6 h-6 bg-yellow-500 rounded-full"></div> Calor (24-30°C)</div>
+          <div className="flex items-center gap-3"><div className="w-6 h-6 bg-red-500 rounded-full"></div> Muy caliente (&gt;30°C)</div>
+        </div>
       </div>
     </div>
   );
