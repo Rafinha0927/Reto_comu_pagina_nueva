@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+// URLs de CloudFront para los archivos que ya están en tu S3
+const CLOUDFRONT_URL = "https://d2h8nqd60uagyp.cloudfront.net";
+const POINTCLOUD_PATH = "/reto-comu-arreglado-main/reto-comu-arreglado-main/static";
+
 const SENSOR_POSITIONS: Record<string, [number, number, number]> = {
   "sensor-01": [-4, 2.5, 4],
   "sensor-02": [4, 2.5, 4],
@@ -29,33 +33,48 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
     if (initialized.current) return;
     initialized.current = true;
 
-    const loadLib = (src: string) =>
+    const loadLib = (src: string, name: string) =>
       new Promise<void>((resolve, reject) => {
+        setStatus(`Cargando ${name}...`);
         const script = document.createElement("script");
         script.src = src;
         script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`No se pudo cargar: ${src}`));
+        script.onload = () => {
+          console.log(`✓ ${name} cargado`);
+          resolve();
+        };
+        script.onerror = () => {
+          const err = `No se pudo cargar ${name} desde ${src}`;
+          console.error(err);
+          reject(new Error(err));
+        };
         document.head.appendChild(script);
       });
 
     const init = async () => {
       try {
-        setStatus("Cargando jQuery...");
-        await loadLib("https://code.jquery.com/jquery-3.6.0.min.js");
+        // Cargar jQuery desde tu S3
+        await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/jquery/jquery-3.1.1.min.js`, "jQuery");
 
-        setStatus("Cargando Three.js...");
-        await loadLib("https://cdn.jsdelivr.net/npm/three@0.168/build/three.min.js");
+        // Cargar Three.js desde tu S3
+        await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/three.js/build/three.min.js`, "Three.js");
 
+        // Cargar Tween desde tu S3
+        await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/tween/tween.min.js`, "Tween.js");
+
+        // Cargar dependencias de Potree desde tu S3
+        await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/libs/other/BinaryHeap.js`, "BinaryHeap.js");
+
+        // Cargar Potree desde tu S3
         setStatus("Cargando Potree...");
-        await loadLib("https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js");
+        await loadLib(`${CLOUDFRONT_URL}${POINTCLOUD_PATH}/build/potree/potree.js`, "Potree.js");
 
         if (!mountRef.current) {
           throw new Error("Container no disponible");
         }
 
         if (!(window as any).Potree) {
-          throw new Error("Potree no cargado");
+          throw new Error("Potree no cargado correctamente desde S3");
         }
 
         setStatus("Creando viewer...");
@@ -67,7 +86,27 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
         viewer.scene.view.position.set(20, 15, 20);
         viewer.scene.view.lookAt(0, 0, 0);
 
-        setStatus("Creando puntos...");
+        setStatus("Cargando nube de puntos...");
+        // Cargar la nube de puntos desde tu S3
+        const pocLoader = new (window as any).Potree.POCLoader();
+        const pointcloudUrl = `${CLOUDFRONT_URL}${POINTCLOUD_PATH}/pointclouds/lion_takanawa`;
+        
+        pocLoader.load(pointcloudUrl, (pointcloud: any) => {
+          console.log("✓ Nube de puntos cargada");
+          viewer.scene.addPointCloud(pointcloud);
+          viewer.fitToScreen();
+          setStatus("✓ Escena 3D lista con nube de puntos");
+        }, 
+        (progress: any) => {
+          const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
+          setStatus(`Cargando nube: ${percent}%`);
+        },
+        (error: any) => {
+          console.warn("No se pudo cargar nube de puntos:", error);
+          setStatus("⚠ Nube de puntos no disponible");
+        });
+
+        setStatus("Creando sensores...");
         const THREE = (window as any).THREE;
         const geometry = new THREE.BufferGeometry();
 
@@ -115,11 +154,10 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
           }
         });
 
-        setStatus("✓ Listo");
         setError("");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(msg);
+        console.error("Error:", msg);
         setError(msg);
         setStatus(`Error: ${msg}`);
       }
