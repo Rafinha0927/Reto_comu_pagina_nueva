@@ -1,0 +1,42 @@
+{
+  "name": "reto-comu-pagina-nueva",
+  "version": "1.0.0",
+  "description": "Aplicación de monitoreo de sensores IoT con visualización 3D",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "preview": "npm run preview --prefix frontend",
+    "deploy:s3": "node scripts/deploy-to-s3.js",
+    "deploy:s3:file": "node scripts/deploy-to-s3.js $1",
+    "deploy:postgis": "node scripts/deploy-postgis.js",
+    "deploy:postgis:file": "node scripts/deploy-postgis.js $1",
+    "deploy:s3:bucket": "cross-env AWS_S3_BUCKET=reto-comu-pointcloud node scripts/deploy-to-s3.js",
+    "invalidate:cf": "node scripts/invalidate-cloudfront.js",
+    "deploy:full": "npm run build && npm run deploy:s3 && npm run invalidate:cf",
+    "deploy:full:postgis": "npm run build && npm run deploy:s3 && npm run deploy:postgis && npm run invalidate:cf"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1"
+  },
+  "keywords": [
+    "IoT",
+    "sensores",
+    "potree",
+    "3D",
+    "websocket",
+    "dynamodb"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}

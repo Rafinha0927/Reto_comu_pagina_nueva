@@ -1,30 +1,31 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Salón IoT - Monitoreo 3D con Potree</title>
-    <script>
-      // Soluciona el error COEP/COOP que da Potree en producción
-      if (location.protocol === 'http:' || location.protocol === 'https:') {
-        if (!document.querySelector('meta[http-equiv="Cross-Origin-Embedder-Policy"]')) {
-          const meta = document.createElement('meta');
-          meta.httpEquiv = 'Cross-Origin-Embedder-Policy';
-          meta.content = 'require-corp';
-          document.head.appendChild(meta);
-        }
-        if (!document.querySelector('meta[http-equiv="Cross-Origin-Opener-Policy"]')) {
-          const meta = document.createElement('meta');
-          meta.httpEquiv = 'Cross-Origin-Opener-Policy';
-          meta.content = 'same-origin';
-          document.head.appendChild(meta);
-        }
-      }
-    </script>
+    <title>Monitoreo Salón - Sistema de Sensores 3D</title>
+    <!-- CSS de Potree (precargar) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.css" />
   </head>
-  <body class="bg-gray-900 text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Script de debugging -->
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        console.log('=== VERIFICACIÓN DE LIBRERÍAS ===');
+        console.log('THREE disponible:', typeof window.THREE !== 'undefined');
+        console.log('Potree disponible:', typeof window.Potree !== 'undefined');
+        console.log('jQuery disponible:', typeof window.jQuery !== 'undefined');
+        console.log('=================================');
+      });
+      
+      // Log global de errores
+      window.addEventListener('error', (event) => {
+        console.error('Error global:', event.error);
+      });
+    </script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
 import Dashboard from "./pages/Dashboard"
 import History from "./pages/History"
-import RealTime from "./pages/RealTime"
+import Realtime from "./pages/Realtime"
 import { Home, History as HistoryIcon, Activity } from "lucide-react"
 
 function App() {
@@ -44,7 +44,7 @@ function App() {
 
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/realtime" element={<RealTime />} />
+          <Route path="/realtime" element={<Realtime />} />
           <Route path="/history" element={<History />} />
         </Routes>
       </div>
