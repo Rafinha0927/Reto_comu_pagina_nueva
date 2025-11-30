@@ -57,6 +57,7 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
       viewer.scene.view.lookAt(0, 0, 0);
 
       // Crear los 4 puntos
+      const THREE = (window as any).THREE;
       const geometry = new THREE.BufferGeometry();
       const positions = new Float32Array(12);
       const colors = new Float32Array(12);
@@ -110,9 +111,8 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
     };
 
     init();
-  }, []);
+  }, [onSensorClick]);
 
-<<<<<<< HEAD
 
   // Actualizar colores en tiempo real
   useEffect(() => {

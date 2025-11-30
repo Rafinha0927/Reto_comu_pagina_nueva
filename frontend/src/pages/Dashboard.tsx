@@ -1,5 +1,5 @@
 import PotreeViewer from "../components/PotreeViewer"
-import { useWebSocket } from "../hooks/useWebSocket"
+import { useWebSocket } from "../hooks/usewebsocket"
 import { useState } from "react"
 import SensorModal from "../components/SensorModal"
 
@@ -13,7 +13,7 @@ export default function Dashboard() {
       {selectedSensor && latestData[selectedSensor] && (
         <SensorModal
           sensorId={selectedSensor}
-          data={latestData[selectedSensor]}
+          sensorData={latestData[selectedSensor]}
           onClose={() => setSelectedSensor(null)}
         />
       )}
