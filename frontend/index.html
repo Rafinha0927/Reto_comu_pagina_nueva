@@ -5,9 +5,27 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Monitoreo Salón - Sistema de Sensores 3D</title>
+    <!-- CSS de Potree (precargar) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.css" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Script de debugging -->
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        console.log('=== VERIFICACIÓN DE LIBRERÍAS ===');
+        console.log('THREE disponible:', typeof window.THREE !== 'undefined');
+        console.log('Potree disponible:', typeof window.Potree !== 'undefined');
+        console.log('jQuery disponible:', typeof window.jQuery !== 'undefined');
+        console.log('=================================');
+      });
+      
+      // Log global de errores
+      window.addEventListener('error', (event) => {
+        console.error('Error global:', event.error);
+      });
+    </script>
   </body>
 </html>
