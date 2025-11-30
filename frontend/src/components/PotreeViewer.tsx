@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  POTREE_LIBRARIES,
+  POTREE_STYLES,
+  POTREE_LOAD_ORDER,
+  POTREE_CLOUD_JS,
+} from "../config/potree-urls";
 
-// URLs de S3 CloudFront - directamente al servidor
-const CLOUDFRONT_URL = "https://d2h8nqd60uagyp.cloudfront.net";
-const S3_PATH = "/reto-comu-arreglado-main/reto-comu-arreglado-main/static";
+// URLs de S3 CloudFront desde variables de entorno
+const CLOUDFRONT_URL = import.meta.env.VITE_CLOUDFRONT_URL || "https://d2h8nqd60uagyp.cloudfront.net";
+const S3_PATH = import.meta.env.VITE_S3_PATH || "/reto-comu-arreglado-main/reto-comu-arreglado-main/static";
 
-// URL de la nube de puntos en S3
-const POINTCLOUD_URL = `${CLOUDFRONT_URL}${S3_PATH}/pointclouds/Puntos`;
+// URL de la nube de puntos en S3 CloudFront
+const POINTCLOUD_URL = POTREE_CLOUD_JS;
 
 const SENSOR_POSITIONS: Record<string, [number, number, number]> = {
   "sensor-01": [-4, 2.5, 4],
@@ -264,32 +270,34 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
       try {
         // Cargar CSS de Potree
         setStatus("Cargando estilos...");
-        loadCSS(`${CLOUDFRONT_URL}${S3_PATH}/build/potree/potree.css`);
-        loadCSS(`${CLOUDFRONT_URL}${S3_PATH}/libs/jquery-ui/jquery-ui.min.css`);
-        loadCSS(`${CLOUDFRONT_URL}${S3_PATH}/libs/openlayers3/ol.css`);
-        loadCSS(`${CLOUDFRONT_URL}${S3_PATH}/libs/spectrum/spectrum.css`);
-        loadCSS(`${CLOUDFRONT_URL}${S3_PATH}/libs/jstree/themes/mixed/style.css`);
+        loadCSS(POTREE_STYLES.potree);
+        loadCSS(POTREE_STYLES.jqueryUI);
+        loadCSS(POTREE_STYLES.openlayers);
+        loadCSS(POTREE_STYLES.spectrum);
+        loadCSS(POTREE_STYLES.jstree);
 
         // Cargar todas las librerías en orden
         setStatus("Cargando librerías...");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/jquery/jquery-3.1.1.min.js`, "jQuery");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/spectrum/spectrum.js`, "Spectrum");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/jquery-ui/jquery-ui.min.js`, "jQueryUI");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/other/BinaryHeap.js`, "BinaryHeap");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/tween/tween.min.js`, "TWEEN");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/d3/d3.js`, "d3");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/proj4/proj4.js`, "proj4");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/openlayers3/ol.js`, "ol");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/i18next/i18next.js`, "i18next");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/jstree/jstree.js`, "jstree");
-
-        setStatus("Cargando Three.js...");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/three.js/build/three.min.js`, "THREE");
-
-        setStatus("Cargando Potree...");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/build/potree/potree.js`, "Potree");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/plasio/js/laslaz.js`, "LAS");
-        await loadLib(`${CLOUDFRONT_URL}${S3_PATH}/libs/shapefile/shapefile.js`, "Shapefile");
+        for (const libKey of POTREE_LOAD_ORDER) {
+          const url = POTREE_LIBRARIES[libKey];
+          const libNames: Record<string, string> = {
+            jquery: "jQuery",
+            spectrum: "Spectrum",
+            jqueryUI: "jQueryUI",
+            binaryHeap: "BinaryHeap",
+            tween: "TWEEN",
+            d3: "d3",
+            proj4: "proj4",
+            openlayers: "OpenLayers",
+            i18next: "i18next",
+            jstree: "jsTree",
+            three: "THREE",
+            potree: "Potree",
+            laslaz: "LAS/LAZ",
+            shapefile: "Shapefile",
+          };
+          await loadLib(url, libNames[libKey] || libKey);
+        }
 
         // Esperar a Potree
         let attempts = 0;
