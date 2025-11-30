@@ -1,33 +1,67 @@
 import { useEffect, useRef } from "react";
 import SensorModal from "./SensorModal";
+
+/**
+ * POSICIONES DE SENSORES EN COORDENADAS 3D
+ * ========================================
+ * Estas coordenadas definen dónde se renderizan los sensores en la escena de Potree.
+ * Si tienes una nube de puntos real (LAS/LAZ), estas posiciones pueden variar.
+ * 
+ * Formato: [x, y, z]
+ * - X: posición horizontal izquierda-derecha
+ * - Y: posición vertical arriba-abajo
+ * - Z: profundidad adelante-atrás
+ * 
+ * IMPORTANTE: Estos valores deben coincidir con las coordenadas de tus sensores
+ * en la tabla DynamoDB (location.x, location.y, location.z)
+ */
 const SENSOR_POSITIONS: Record<string, [number, number, number]> = {
-  "sensor-01": [-4, 2.5, 4],
-  "sensor-02": [4, 2.5, 4],
-  "sensor-03": [-4, 2.5, -4],
-  "sensor-04": [4, 2.5, -4],
+  "sensor-01": [-4, 2.5, 4],   // Esquina superior izquierda frontal
+  "sensor-02": [4, 2.5, 4],    // Esquina superior derecha frontal
+  "sensor-03": [-4, 2.5, -4],  // Esquina superior izquierda trasera
+  "sensor-04": [4, 2.5, -4],   // Esquina superior derecha trasera
 };
 
 interface Props {
-  latestData: Record<string, any>;
-  onSensorClick: (id: string) => void;
+  latestData: Record<string, any>; // Datos de WebSocket: { "sensor-01": { temperature, humidity, ... }, ... }
+  onSensorClick: (id: string) => void; // Callback cuando se hace clic en un sensor
 }
 
 export default function PotreeViewer({ latestData, onSensorClick }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
 
+  /**
+   * CÓDIGO DE COLOR BASADO EN TEMPERATURA
+   * ======================================
+   * Retorna valores RGB (0-255) según la temperatura del sensor
+   * 
+   * - Azul: < 18°C (frío)
+   * - Verde: 18-24°C (normal/confortable)
+   * - Amarillo: 24-30°C (caliente)
+   * - Rojo: > 30°C (muy caliente)
+   * 
+   * Estos colores se aplican al renderizado de los puntos en Potree
+   */
   const getColorFromTemp = (temp: number) => {
-    if (temp < 18) return [0, 0, 255];
-    if (temp < 24) return [0, 255, 0];
-    if (temp < 30) return [255, 255, 0];
-    return [255, 0, 0];
+    if (temp < 18) return [0, 0, 255];      // Azul - Frío
+    if (temp < 24) return [0, 255, 0];      // Verde - Normal
+    if (temp < 30) return [255, 255, 0];    // Amarillo - Caliente
+    return [255, 0, 0];                     // Rojo - Muy caliente
   };
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
-    // Forzamos que los scripts se carguen desde CDN absoluto (esto evita el bug de Vite)
+    /**
+     * CARGAR LIBRERÍAS DESDE CDN
+     * ==========================
+     * Las librerías necesarias se cargan de forma dinámica:
+     * - Three.js: Motor 3D que renderiza escenas
+     * - Potree: Visualizador de nubes de puntos
+     * - jQuery, BinaryHeap, Tween, dgreed: Dependencias de Potree
+     */
     const loadScript = (src: string) => {
       return new Promise((resolve) => {
         const script = document.createElement("script");
@@ -39,20 +73,41 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
     };
 
     const init = async () => {
+      // Cargar Three.js (motor gráfico 3D)
       await loadScript("https://cdn.jsdelivr.net/npm/three@0.168/build/three.min.js");
+      
+      // Cargar Potree y sus dependencias
       await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js");
       await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/jquery/jquery-3.1.1.min.js");
       await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/other/BinaryHeap.js");
       await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/tween/tween.min.js");
       await loadScript("https://cdn.jsdelivr.net/npm/potree@1.8/libs/dgreed/dgreed.js");
 
-      // Ahora sí creamos el viewer
+      /**
+       * CREAR Y CONFIGURAR EL VIEWER DE POTREE
+       * ======================================
+       * El Viewer es el contenedor principal que renderiza la escena 3D
+       */
       const viewer = new (window as any).Potree.Viewer(mountRef.current!);
+      
+      // EDL = Eye Dome Lighting (mejora la visualización de nubes densas)
       viewer.setEDLEnabled(true);
+      
+      // Campo visual de 60 grados
       viewer.setFOV(60);
+      
+      // Límite de puntos a renderizar (rendimiento)
       viewer.setPointBudget(1_000_000);
+      
+      // Fondo negro para mejor contraste
       viewer.setBackground("black");
 
+      /**
+       * POSICIONAR LA CÁMARA
+       * ====================
+       * - position.set(x, y, z): Dónde está la cámara
+       * - lookAt(x, y, z): Hacia dónde mira la cámara
+       */
       viewer.scene.view.position.set(20, 15, 20);
       viewer.scene.view.lookAt(0, 0, 0);
 
