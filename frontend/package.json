@@ -1,26 +1,29 @@
-"dependencies": {
-  "react": "^18.3.1",
-  "react-dom": "^18.3.1",
-  "react-router-dom": "^6.26.2",
-  "recharts": "^2.12.7",
-  "@react-three/fiber": "^8.16.8",
-  "@react-three/drei": "^9.112.1",
-  "three": "^0.168.0",
-  "papaparse": "^5.4.1",
-  "tailwindcss": "^3.4.1"
-},
-"devDependencies": {
-  "@types/react": "^18.0.38",
-  "@types/react-dom": "^18.0.11",
-  "typescript": "^5.5.4",
-  "vite": "^4.4.9",
-  "@vitejs/plugin-react": "^4.0.3"
+{
+  "name": "salon-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7",
+    "lucide-react": "^0.447.0",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8"
+  }
 }
-}// Posiciones fijas de los sensores en el espacio 3D del salón
-
-const SENSOR_POSITIONS: Record<string, [10, 8, 3]> = {
-  "sensor-01": [-4, 1, 2.5],   // esquina izquierda delantera
-  "sensor-02": [4, 1, 2.5],    // esquina derecha delantera
-  "sensor-03": [-4, -6, 2.5],  // esquina izquierda trasera
-  "sensor-04": [4, -6, 2.5],   // esquina derecha trasera
-};

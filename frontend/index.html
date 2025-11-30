@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Salón IoT - Monitoreo 3D con Potree</title>
+    <script>
+      // Soluciona el error COEP/COOP que da Potree en producción
+      if (location.protocol === 'http:' || location.protocol === 'https:') {
+        if (!document.querySelector('meta[http-equiv="Cross-Origin-Embedder-Policy"]')) {
+          const meta = document.createElement('meta');
+          meta.httpEquiv = 'Cross-Origin-Embedder-Policy';
+          meta.content = 'require-corp';
+          document.head.appendChild(meta);
+        }
+        if (!document.querySelector('meta[http-equiv="Cross-Origin-Opener-Policy"]')) {
+          const meta = document.createElement('meta');
+          meta.httpEquiv = 'Cross-Origin-Opener-Policy';
+          meta.content = 'same-origin';
+          document.head.appendChild(meta);
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-gray-900 text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
