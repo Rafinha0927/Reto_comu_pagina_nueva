@@ -111,55 +111,108 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
       viewer.scene.view.position.set(20, 15, 20);
       viewer.scene.view.lookAt(0, 0, 0);
 
-      // Crear los 4 puntos
+      /**
+       * CREAR GEOMETRÍA DE PUNTOS
+       * =========================
+       * BufferGeometry almacena vértices, colores y tamaños en buffers de GPU
+       * para un renderizado eficiente
+       */
       const THREE = (window as any).THREE;
       const geometry = new THREE.BufferGeometry();
+      
+      // 4 sensores * 3 coords (x,y,z) = 12 valores
       const positions = new Float32Array(12);
       const colors = new Float32Array(12);
       const sizes = new Float32Array(4).fill(200);
 
+      /**
+       * POBLAR BUFFERS CON DATOS DE SENSORES
+       * ====================================
+       * Para cada sensor, asignamos:
+       * - Posición (x, y, z)
+       * - Color (RGB 0-1)
+       * - Tamaño del punto
+       */
       Object.values(SENSOR_POSITIONS).forEach(([x, y, z], i) => {
+        // Posición: array[i*3], array[i*3+1], array[i*3+2] = x, y, z
         positions[i * 3] = x;
         positions[i * 3 + 1] = y;
         positions[i * 3 + 2] = z;
+        
+        // Color inicial: gris (0.8, 0.8, 0.8)
         colors[i * 3] = 0.8;
         colors[i * 3 + 1] = 0.8;
         colors[i * 3 + 2] = 0.8;
       });
 
+      /**
+       * ASIGNAR ATRIBUTOS A LA GEOMETRÍA
+       * ================================
+       * Cada atributo tiene 3 componentes para posiciones/colores (x,y,z o r,g,b)
+       * y 1 componente para tamaño
+       */
       geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
       geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
 
+      /**
+       * CREAR MATERIAL Y PUNTOS
+       * ======================
+       * PointsMaterial: Material especializado para nubes de puntos
+       * VertexColors: Cada vértice tiene su propio color (se actualiza en real time)
+       * PointSizeType.FIXED: Tamaño fijo independiente de la distancia a cámara
+       */
       const material = new (window as any).Potree.PointsMaterial({
         vertexColors: THREE.VertexColors,
         size: 200,
         sizeType: (window as any).Potree.PointSizeType.FIXED,
       });
 
+      // Crear objeto de puntos y agregarlo a la escena
       const points = new (window as any).Potree.Points(geometry, material);
-      points.frustumCulled = false;
+      points.frustumCulled = false; // Siempre renderizar (no culling)
       viewer.scene.pointclouds.push(points);
       viewer.scene.scene.add(points);
 
-      // Guardamos referencia para actualizar colores
+      /**
+       * GUARDAR REFERENCIAS GLOBALES
+       * =============================
+       * Almacenamos referencias para actualizar colores en real time
+       * cuando cambian los datos de temperatura de los sensores
+       */
       (window as any).sensorPoints = { geometry, colors: colors };
 
-      // Click
+      /**
+       * DETECTOR DE CLICS EN PUNTOS
+       * ===========================
+       * Usando Raycaster de Three.js para detectar cuando el usuario hace clic
+       * en uno de los puntos de sensores
+       */
       viewer.renderer.domElement.addEventListener("click", (e: MouseEvent) => {
+        // Convertir coordenadas de pantalla a coordenadas normalizadas (-1 a 1)
         const rect = viewer.renderer.domElement.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
+        // Crear raycast desde cámara hacia el punto del clic
         const camera = viewer.scene.getActiveCamera();
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera({ x, y }, camera);
+        
+        // threshold = 3: área de tolerancia alrededor de los puntos
         raycaster.params.Points.threshold = 3;
 
+        // Detectar intersecciones con los puntos de sensores
         const hits = raycaster.intersectObject(points);
+        
         if (hits.length > 0) {
+          // Si hay intersección, obtener el índice del punto clickeado
           const idx = hits[0].index!;
+          
+          // Convertir índice a ID de sensor
           const sensorId = Object.keys(SENSOR_POSITIONS)[idx];
+          
+          // Llamar al callback para abrir el modal del sensor
           onSensorClick(sensorId);
         }
       });
@@ -169,18 +222,31 @@ export default function PotreeViewer({ latestData, onSensorClick }: Props) {
   }, [onSensorClick]);
 
 
-  // Actualizar colores en tiempo real
+  /**
+   * ACTUALIZAR COLORES EN TIEMPO REAL
+   * ==================================
+   * Cada vez que cambian los datos de latestData (nuevos datos de WebSocket),
+   * actualizamos los colores de los puntos según la temperatura
+   */
   useEffect(() => {
     if (!(window as any).sensorPoints) return;
     const colors = (window as any).sensorPoints.colors;
 
+    // Iterar sobre cada sensor
     Object.entries(SENSOR_POSITIONS).forEach(([id], i) => {
+      // Obtener temperatura actual o usar default 20°C
       const temp = latestData[id]?.temperature ?? 20;
+      
+      // Obtener color RGB (0-255) según temperatura
       const [r, g, b] = getColorFromTemp(temp);
+      
+      // Convertir a rango 0-1 para el buffer
       colors.array[i * 3] = r / 255;
       colors.array[i * 3 + 1] = g / 255;
       colors.array[i * 3 + 2] = b / 255;
     });
+    
+    // Marcar buffer como actualizado para que Three.js lo re-renderice
     colors.needsUpdate = true;
   }, [latestData]);
 
