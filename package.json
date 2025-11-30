@@ -24,7 +24,19 @@
   "devDependencies": {
     "concurrently": "^8.2.1"
   },
-  "keywords": ["IoT", "sensores", "potree", "3D", "websocket", "dynamodb"],
+  "keywords": [
+    "IoT",
+    "sensores",
+    "potree",
+    "3D",
+    "websocket",
+    "dynamodb"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5"
+  }
 }
