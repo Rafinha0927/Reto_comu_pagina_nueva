@@ -17,7 +17,7 @@ export const saveReading = async (data: any) => {
 };
 
 export const getLatestReadings = async () => {
-  const sensors = ["sensor-01", "sensor-02", "¿sensor-03", "sensor-04"];
+  const sensors = ["sensor-01", "sensor-02", "sensor-03", "sensor-04"];
   const latest: Record<string, any> = {};
 
   for (const sensorId of sensors) {

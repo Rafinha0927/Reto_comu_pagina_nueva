@@ -1,11 +1,10 @@
-// frontend/src/components/PotreeViewer.tsx
 import { useEffect, useRef, useState } from "react";
 import SensorModal from "./SensorModal";
 
 declare global {
   interface Window {
     Potree: any;
-    potreeViewer: any;
+    THREE: any;
   }
 }
 
@@ -41,12 +40,24 @@ export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewer
   };
 
   useEffect(() => {
-    if (!containerRef.current || window.Potree) return;
+    if (!containerRef.current) return;
+    
+    if (window.Potree && window.THREE) {
+      initPotree();
+      return;
+    }
 
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js";
-    script.onload = () => initPotree();
-    document.body.appendChild(script);
+    // Cargar THREE primero
+    const threeScript = document.createElement("script");
+    threeScript.src = "https://cdn.jsdelivr.net/npm/three@0.168/build/three.min.js";
+    threeScript.onload = () => {
+      // Luego cargar Potree
+      const potreeScript = document.createElement("script");
+      potreeScript.src = "https://cdn.jsdelivr.net/npm/potree@1.8/build/potree/potree.js";
+      potreeScript.onload = () => initPotree();
+      document.body.appendChild(potreeScript);
+    };
+    document.body.appendChild(threeScript);
 
     const css = document.createElement("link");
     css.rel = "stylesheet";
@@ -54,8 +65,8 @@ export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewer
     document.head.appendChild(css);
 
     return () => {
-      document.body.removeChild(script);
-      document.head.removeChild(css);
+      if (threeScript.parentNode) document.body.removeChild(threeScript);
+      if (css.parentNode) document.head.removeChild(css);
     };
   }, []);
 
@@ -95,6 +106,7 @@ export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewer
   };
 
   const createSensorPoints = (viewer: any) => {
+    const THREE = window.THREE;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(4 * 3);
     const colors = new Float32Array(4 * 3);
@@ -133,6 +145,7 @@ export default function PotreeViewer({ latestData, onSensorClick }: PotreeViewer
 
     // Click en sensores
     viewer.renderer.domElement.addEventListener("mousedown", (event: any) => {
+      const THREE = window.THREE;
       const mouse = viewer.inputHandler.getNormalizedEventPosition(event);
       const camera = viewer.scene.getActiveCamera();
       const domElement = viewer.renderer.domElement;
